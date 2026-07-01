@@ -14,7 +14,8 @@ static SDL_Texture *texture = NULL;
 static int texture_width = 0;
 static int texture_height = 0;
 static float clock_scale = 10;
-static float offset = 36;
+static int offset = 36;
+static int night_chunk = 0;
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -67,7 +68,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    float i;
+    int i;
 
     SDL_FRect dst_rect;
     const Uint64 now = SDL_GetTicks();
@@ -93,7 +94,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_RenderFillRect(renderer, &dst_rect);
 
     SDL_Vertex vertices[3];
-    for (i= 0; i < 16; i++)
+    for (i= 0; i < night_chunk; i++)
     {
         const float size = 65.0f;
         const float x = (WINDOW_WIDTH /2 );
