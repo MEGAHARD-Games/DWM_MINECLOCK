@@ -8,7 +8,7 @@
 #include <ctime>
 #include <cmath>
 
-#define TIMEZONEOFFSET (-5)
+#define TIMEZONEOFFSET (2)
 #define LATITUDE 52.219705
 #define LONGITUDE 6.901704
 #define WINDOW_WIDTH 256
@@ -22,12 +22,14 @@ static int texture_height = 0;
 static float clock_scale = 10;
 static int offset = 36;
 static int night_chunk = 0;
+static float sunset_final = 0;
+void Calibrate();
+void setTime();
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     Calibrate();
-
     SDL_Surface *surface = NULL;
     char *png_path = NULL;
 
@@ -76,6 +78,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
+    setTime();
+
     int i;
 
     SDL_FRect dst_rect;
@@ -132,7 +136,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_RenderTexture(renderer, texture, NULL, &dst_rect);
 
     SDL_RenderPresent(renderer);  /* put it all on the screen! */
-
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
@@ -160,6 +163,7 @@ void Calibrate()
     std::tm local{};
 #ifdef _WIN32
     localtime_s(&local, &tt);
+    // idk what I'm checking here
 #else
     local = *std::localtime(&tt);
 #endif
@@ -238,8 +242,7 @@ void Calibrate()
 
     if (rise < 0 || set < 0)
     {
-        sunrise_hour = sunrise_minute = -1;
-        sunset_hour = sunset_minute = -1;
+        night_chunk = 0;
         return;
     }
 
@@ -260,16 +263,42 @@ void Calibrate()
         sunset_minute = 0;
         sunset_hour = (sunset_hour + 1) % 24;
     }
-
-    night_chunk = ((24 - sunset_hour) + (sunrise_hour))*2;
+    //night_chunk = ((24 - sunset_hour) + (sunrise_hour))*2;
 
     if (sunrise_minute >= 30)
     {
-        night_chunk += 1;
+        //night_chunk += 1;
     }
 
     if (sunset_minute >= 30)
     {
-        night_chunk -= 1;
+        sunset_final = (sunset_hour * 2) + 1;
+        //night_chunk -= 1;
+    }else
+        sunset_final = sunset_hour * 2;
+}
+
+void setTime()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
+
+    std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &tt);
+    // idk what I'm checking here
+#else
+    local = *std::localtime(&tt);
+#endif
+
+    int hour = local.tm_hour;
+    int minute = local.tm_min;
+
+    //this makes sense trust
+    offset = (sunset_final - (hour*2))-12;
+
+    if (minute > 30)
+    {
+        offset += 1;
     }
 }
