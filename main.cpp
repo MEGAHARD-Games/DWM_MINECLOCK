@@ -5,14 +5,16 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
+#define WINDOW_WIDTH 256
+#define WINDOW_HEIGHT 256
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static SDL_Texture *texture = NULL;
 static int texture_width = 0;
 static int texture_height = 0;
+static float clock_scale = 10;
+static float offset = 36;
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -21,7 +23,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     char *png_path = NULL;
 
     /* Create the window */
-    if (!SDL_CreateWindowAndRenderer("Hello World", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    if (!SDL_CreateWindowAndRenderer("Hello World", 256, 256, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         SDL_Log("Couldn't create window and renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
@@ -46,6 +48,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_PIXELART);
+
     SDL_DestroySurface(surface);  /* done with this, the texture has a copy of the pixels now. */
 
     return SDL_APP_CONTINUE;
@@ -54,8 +58,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 /* This function runs when a new event (mouse input, keypresses, etc.) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    if (event->type == SDL_EVENT_KEY_DOWN ||
-        event->type == SDL_EVENT_QUIT) {
+    if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
     }
     return SDL_APP_CONTINUE;
@@ -64,39 +67,59 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
+    float i;
+
     SDL_FRect dst_rect;
     const Uint64 now = SDL_GetTicks();
 
-    /* we'll have some textures move around over a few seconds. */
-    const float direction = ((now % 2000) >= 1000) ? 1.0f : -1.0f;
-    const float scale = ((float) (((int) (now % 1000)) - 500) / 500.0f) * direction;
-
-    /* as you can see from this, rendering draws over whatever was drawn before it. */
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);  /* black, full alpha */
-    SDL_RenderClear(renderer);  /* start with a blank canvas. */
+    SDL_RenderClear(renderer);
 
-    /* Just draw the static texture a few times. You can think of it like a
-       stamp, there isn't a limit to the number of times you can draw with it. */
+    /* taken from SDL Example 03-lines
+    for (i = 0; i < 360; i++) {
+        const float size = 65.0f;
+        const float x = (WINDOW_WIDTH / 2);
+        const float y = (WINDOW_HEIGHT / 2);
+        const float r = (float) i * (SDL_PI_F / 180.0f);
+        SDL_SetRenderDrawColor(renderer, 73, 104, 216, SDL_ALPHA_OPAQUE);
+        SDL_RenderLine(renderer, x, y, x + SDL_cosf(r) * size, y + SDL_sinf(r) * size);
+    }*/
 
-    /* top left */
-    dst_rect.x = (100.0f * scale);
-    dst_rect.y = 0.0f;
-    dst_rect.w = (float) texture_width;
-    dst_rect.h = (float) texture_height;
-    SDL_RenderTexture(renderer, texture, NULL, &dst_rect);
+    SDL_SetRenderDrawColor(renderer, 73, 104, 216, SDL_ALPHA_OPAQUE);
+    dst_rect.x = (float) ((WINDOW_WIDTH - 10 * clock_scale) / 2.0f);
+    dst_rect.y = (float) ((WINDOW_HEIGHT -12 * clock_scale) / 2.0f);
+    dst_rect.w = (float) 10 * clock_scale;
+    dst_rect.h = (float) 7 * clock_scale;
+    SDL_RenderFillRect(renderer, &dst_rect);
 
-    /* center this one. */
-    dst_rect.x = ((float) (WINDOW_WIDTH - texture_width)) / 2.0f;
-    dst_rect.y = ((float) (WINDOW_HEIGHT - texture_height)) / 2.0f;
-    dst_rect.w = (float) texture_width;
-    dst_rect.h = (float) texture_height;
-    SDL_RenderTexture(renderer, texture, NULL, &dst_rect);
+    SDL_Vertex vertices[3];
+    for (i= 0; i < 16; i++)
+    {
+        const float size = 65.0f;
+        const float x = (WINDOW_WIDTH /2 );
+        const float y = (WINDOW_HEIGHT / 2 );
+        const float r = (SDL_PI_F / 180.0f);
+        const float step = 7.5f * (i + offset);
+        SDL_zeroa(vertices);
+        vertices[0].position.x = x;
+        vertices[0].position.y = y;
+        vertices[0].color.r = 30.0f/255.0f;
+        vertices[0].color.g = vertices[0].color.b = 28.0f/255.0f;
+        vertices[0].color.a = 1.0f;
+        vertices[1].position.x = x + SDL_cosf(r * step) *size;
+        vertices[1].position.y = y + SDL_sinf(r * step) *size;
+        vertices[1].color = vertices[0].color;
+        vertices[2].position.x = x + SDL_cosf(r*(step + 7.5)) *size;
+        vertices[2].position.y = y + SDL_sinf(r*(step+7.5)) *size;
+        vertices[2].color = vertices[0].color;
 
-    /* bottom right. */
-    dst_rect.x = ((float) (WINDOW_WIDTH - texture_width)) - (100.0f * scale);
-    dst_rect.y = (float) (WINDOW_HEIGHT - texture_height);
-    dst_rect.w = (float) texture_width;
-    dst_rect.h = (float) texture_height;
+        SDL_RenderGeometry(renderer, NULL, vertices, 3, NULL, 0);
+    }
+
+    dst_rect.x = ((float) (WINDOW_WIDTH - texture_width * clock_scale)) / 2.0f;
+    dst_rect.y = ((float) (WINDOW_HEIGHT - texture_height * clock_scale)) / 2.0f;
+    dst_rect.w = (float) texture_width * clock_scale;
+    dst_rect.h = (float) texture_height * clock_scale;
     SDL_RenderTexture(renderer, texture, NULL, &dst_rect);
 
     SDL_RenderPresent(renderer);  /* put it all on the screen! */
